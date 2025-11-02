@@ -32,6 +32,8 @@ jobs:
 | --- | --- | --- |
 | `install-dir` | Directory that will receive the `ecoscalpel` binary. | `${{ runner.temp }}/ecoscalpel/bin` |
 | `api-key` | Optional API key written to `~/.config/ecoscalpel/config.json`. | |
+| `repo` | Git repository URL cloned to build the CLI. | `https://github.com/didier-segura/ecoscalpel.git` |
+| `ref` | Git ref (branch, tag, commit) to checkout before building. | `main` |
 
 ### Outputs
 

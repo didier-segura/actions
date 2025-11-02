@@ -10,6 +10,12 @@ inputs:
   api-key:
     description: EcoScalpel API key stored in the CLI config (masked).
     default: ""
+  repo:
+    description: Git repository URL containing the EcoScalpel CLI source.
+    default: https://github.com/didier-segura/ecoscalpel.git
+  ref:
+    description: Git ref (branch, tag, or commit) to checkout from the EcoScalpel repository.
+    default: main
 outputs:
   ecoscalpel-path:
     description: Absolute path to the EcoScalpel binary.
@@ -20,7 +26,7 @@ runs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version-file: ${{ github.action_path }}/../../ecoscalpel/go.mod
+        go-version: "1.22.x"
         check-latest: true
 
     - name: Build EcoScalpel
@@ -28,13 +34,23 @@ runs:
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs['install-dir'] }}
+        REPO: ${{ inputs.repo }}
+        REF: ${{ inputs.ref }}
       run: |
         set -euo pipefail
 
         install_dir="${INSTALL_DIR}"
         mkdir -p "$install_dir"
 
-        pushd "$GITHUB_ACTION_PATH/../../ecoscalpel" >/dev/null
+        src_dir="$(mktemp -d)"
+        export GIT_TERMINAL_PROMPT=0
+        if [ -n "$REF" ]; then
+          git clone --depth=1 --branch "$REF" "$REPO" "$src_dir"
+        else
+          git clone --depth=1 "$REPO" "$src_dir"
+        fi
+
+        pushd "$src_dir" >/dev/null
         CGO_ENABLED=0 go build -o "$install_dir/ecoscalpel" .
         popd >/dev/null
 

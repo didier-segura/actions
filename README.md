@@ -34,13 +34,13 @@ jobs:
           terraform_version: 1.8.5
 
       - name: Setup EcoScalpel
-        uses: scaleway/ecoscalpel/actions/setup@main
+        uses: didier-segura/actions/setup@main
         with:
           api-key: ${{ secrets.ECOSCALPEL_API_KEY }}
 
       - name: Run EcoScalpel
         id: run
-        uses: scaleway/ecoscalpel/actions/run@main
+        uses: didier-segura/actions/run@main
         with:
           setup_api_key: ${{ secrets.ECOSCALPEL_API_KEY }}
           mode: dir

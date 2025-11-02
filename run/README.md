@@ -26,7 +26,7 @@ jobs:
 
       - name: Run EcoScalpel
         id: run
-        uses: scaleway/ecoscalpel/actions/run@main
+        uses: didier-segura/actions/run@main
         with:
           setup_api_key: ${{ secrets.ECOSCALPEL_API_KEY }}
           mode: dir
