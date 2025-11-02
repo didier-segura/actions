@@ -59,21 +59,20 @@ runs:
           *) echo "::error::Unsupported architecture: $arch"; exit 1 ;;
         esac
 
-        asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch "$arch" '
+        asset_url="$(echo "$release_data" | jq -r --arg arch "$arch" '
           [ .assets[]
-            | select(.name | test("ecoscalpel-" + $os + ".*" + $arch + "", "i"))
+            | select(.name | test("ecoscalpel-" + $arch + "", "i"))
             | .browser_download_url ][0]')"
 
         if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
-          asset_url="$(echo "$release_data" | jq -r --arg os "$os" '
+          asset_url="$(echo "$release_data" | jq -r '
             [ .assets[]
-              | select(.name | test("ecoscalpel-" + $os, "i"))
+              | select(.name | test("ecoscalpel", "i"))
               | .browser_download_url ][0]')"
         fi
 
         if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
-          echo "::error::Could not find a release asset for OS=$os arch=$arch in $version"
-          exit 1
+          asset_url="https://github.com/$owner/$repo/releases/download/${version}/ecoscalpel"  # fallback to default asset name
         fi
 
         asset_name="$(basename "$asset_url")"
