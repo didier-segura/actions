@@ -1,0 +1,79 @@
+name: "Setup EcoScalpel CLI"
+description: Install the EcoScalpel CLI for cost and sustainability analysis of Scaleway Terraform projects.
+branding:
+  icon: activity
+  color: purple
+inputs:
+  install-dir:
+    description: Directory where the EcoScalpel binary will be stored.
+    default: ${{ runner.temp }}/ecoscalpel/bin
+  api-key:
+    description: EcoScalpel API key stored in the CLI config (masked).
+    default: ""
+outputs:
+  ecoscalpel-path:
+    description: Absolute path to the EcoScalpel binary.
+    value: ${{ steps.build.outputs.cli_path }}
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ github.action_path }}/../../ecoscalpel/go.mod
+        check-latest: true
+
+    - name: Build EcoScalpel
+      id: build
+      shell: bash
+      env:
+        INSTALL_DIR: ${{ inputs['install-dir'] }}
+      run: |
+        set -euo pipefail
+
+        install_dir="${INSTALL_DIR}"
+        mkdir -p "$install_dir"
+
+        pushd "$GITHUB_ACTION_PATH/../../ecoscalpel" >/dev/null
+        CGO_ENABLED=0 go build -o "$install_dir/ecoscalpel" .
+        popd >/dev/null
+
+        chmod +x "$install_dir/ecoscalpel"
+        echo "$install_dir" >> "$GITHUB_PATH"
+        echo "cli_path=$(cd "$install_dir" && pwd)/ecoscalpel" >> "$GITHUB_OUTPUT"
+
+    - name: Configure EcoScalpel credentials
+      if: ${{ inputs.api-key != '' }}
+      shell: bash
+      env:
+        API_KEY: ${{ inputs.api-key }}
+      run: |
+        set -euo pipefail
+
+        echo "::add-mask::$API_KEY"
+        config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ecoscalpel"
+        config_file="$config_dir/config.json"
+        mkdir -p "$config_dir"
+
+        python3 - "$config_file" <<'PY'
+import json, os, sys, datetime
+
+cfg_path = sys.argv[1]
+api_key = os.environ["API_KEY"]
+now = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+cfg = {}
+try:
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+except FileNotFoundError:
+    pass
+except Exception as exc:
+    print(f"::warning::Could not parse existing config {cfg_path}: {exc}")
+
+cfg["api_key"] = api_key
+cfg["updated_at"] = now
+
+with open(cfg_path, "w", encoding="utf-8") as f:
+    json.dump(cfg, f, indent=2)
+PY

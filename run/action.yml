@@ -1,0 +1,186 @@
+name: "EcoScalpel Run"
+description: >
+  Generate Terraform plans (optional) and run the EcoScalpel CLI to estimate
+  Scaleway cost, CO₂, and water footprints.
+branding:
+  icon: activity
+  color: purple
+inputs:
+  mode:
+    description: >
+      How EcoScalpel reads infrastructure definitions. Use `plan` to consume a
+      Terraform plan JSON or `dir` to parse Terraform source files directly.
+    default: plan
+  terraform_dir:
+    description: Directory containing the Terraform configuration.
+    default: "."
+  plan_file:
+    description: Relative path to the Terraform plan JSON file to use or generate.
+    default: ecoscalpel-plan.json
+  skip_plan:
+    description: >
+      Set to 'true' to skip generating a Terraform plan and reuse the plan_file
+      supplied in the repository.
+    default: "false"
+  terraform_plan_args:
+    description: Additional arguments passed to `terraform plan`.
+    default: "-lock=false"
+  format:
+    description: Output format passed to EcoScalpel (`table`, `markdown`, or `json`).
+    default: markdown
+  style:
+    description: Optional style passed to EcoScalpel (`-style` flag). Leave blank to skip.
+    default: fancy
+  output_file:
+    description: Relative path where the EcoScalpel report will be written.
+    default: ""
+  push_endpoint:
+    description: Optional collector endpoint to push reports to.
+    default: ""
+  push_api_key:
+    description: API key used when pushing reports to a collector.
+    default: ""
+  push_project:
+    description: Project name used when pushing reports.
+    default: ""
+  push_metadata:
+    description: >
+      Optional comma separated list of key=value metadata pairs passed with push requests.
+    default: ""
+  push_fail_on_error:
+    description: Fail the workflow if pushing the report fails.
+    default: "false"
+  setup_api_key:
+    description: API key forwarded to the setup action.
+    default: ""
+outputs:
+  plan_path:
+    description: Absolute path to the Terraform plan JSON that EcoScalpel consumed.
+    value: ${{ steps.plan.outputs.plan_path }}
+  report_path:
+    description: Absolute path to the EcoScalpel report written to disk.
+    value: ${{ steps.run.outputs.report_path }}
+  report:
+    description: Raw EcoScalpel report output (matches the requested format).
+    value: ${{ steps.run.outputs.report }}
+runs:
+  using: composite
+  steps:
+    - name: Install EcoScalpel CLI
+      id: setup
+      uses: ./../setup
+      with:
+        api-key: ${{ inputs.setup_api_key }}
+
+    - name: Generate Terraform plan (JSON)
+      id: plan
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        SKIP_PLAN: ${{ inputs.skip_plan }}
+      run: |
+        set -euo pipefail
+
+        if [ "$MODE" = "dir" ]; then
+          echo "plan_path=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        plan_path="${{ inputs.plan_file }}"
+        if [ -z "$plan_path" ]; then
+          plan_path="ecoscalpel-plan.json"
+        fi
+
+        if [ "$SKIP_PLAN" != "true" ]; then
+          mkdir -p "$(dirname "$plan_path")"
+          tmp_plan="$RUNNER_TEMP/ecoscalpel.tfplan"
+          terraform -chdir="${{ inputs.terraform_dir }}" init -input=false -no-color
+          terraform -chdir="${{ inputs.terraform_dir }}" plan -input=false -no-color -out="$tmp_plan" ${{ inputs.terraform_plan_args }}
+          terraform -chdir="${{ inputs.terraform_dir }}" show -json "$tmp_plan" > "$plan_path"
+        else
+          if [ ! -f "$plan_path" ]; then
+            echo "::error::skip_plan=true but plan file not found at '$plan_path'."
+            exit 1
+          fi
+        fi
+
+        if [ ! -f "$plan_path" ]; then
+          echo "::error::Terraform plan JSON not found at '$plan_path'. Generate it by keeping skip_plan=false or provide the file yourself."
+          exit 1
+        fi
+
+        plan_abs="$(cd "$(dirname "$plan_path")" && pwd)/$(basename "$plan_path")"
+        echo "plan_path=$plan_abs" >> "$GITHUB_OUTPUT"
+
+    - name: Run EcoScalpel
+      id: run
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        TERRAFORM_DIR: ${{ inputs.terraform_dir }}
+        ECOSCALPEL: ${{ steps.setup.outputs.ecoscalpel-path }}
+        FORMAT: ${{ inputs.format }}
+        STYLE: ${{ inputs.style }}
+        OUTPUT_FILE: ${{ inputs.output_file }}
+        PUSH_ENDPOINT: ${{ inputs.push_endpoint }}
+        PUSH_API_KEY: ${{ inputs.push_api_key }}
+        PUSH_PROJECT: ${{ inputs.push_project }}
+        PUSH_METADATA: ${{ inputs.push_metadata }}
+        PUSH_FAIL_ON_ERROR: ${{ inputs.push_fail_on_error }}
+      run: |
+        set -euo pipefail
+
+        plan_path='${{ steps.plan.outputs.plan_path }}'
+        report_path="$OUTPUT_FILE"
+        if [ -z "$report_path" ]; then
+          ext="$FORMAT"
+          if [ "$FORMAT" = "table" ]; then
+            ext="txt"
+          elif [ "$FORMAT" = "markdown" ]; then
+            ext="md"
+          fi
+          report_path="ecoscalpel-report.$ext"
+        fi
+        mkdir -p "$(dirname "$report_path")"
+
+        if [ "$MODE" = "dir" ]; then
+          cmd=("$ECOSCALPEL" "-dir" "$TERRAFORM_DIR" "-format" "$FORMAT")
+        else
+          plan_path='${{ steps.plan.outputs.plan_path }}'
+          if [ -z "$plan_path" ]; then
+            echo "::error::Plan path is empty. Ensure the plan step completed successfully."
+            exit 1
+          fi
+          cmd=("$ECOSCALPEL" "-plan" "$plan_path" "-format" "$FORMAT")
+        fi
+
+        if [ -n "$STYLE" ]; then
+          cmd+=("-style" "$STYLE")
+        fi
+        if [ -n "$PUSH_ENDPOINT" ]; then
+          cmd+=("-push-endpoint" "$PUSH_ENDPOINT")
+        fi
+        if [ -n "$PUSH_API_KEY" ]; then
+          cmd+=("-push-api-key" "$PUSH_API_KEY")
+        fi
+        if [ -n "$PUSH_PROJECT" ]; then
+          cmd+=("-push-project" "$PUSH_PROJECT")
+        fi
+        if [ -n "$PUSH_METADATA" ]; then
+          cmd+=("-push-metadata" "$PUSH_METADATA")
+        fi
+        if [ "$PUSH_FAIL_ON_ERROR" = "true" ]; then
+          cmd+=("-push-fail-on-error")
+        fi
+
+        report="$("${cmd[@]}")"
+        printf '%s\n' "$report" > "$report_path"
+
+        report_abs="$(cd "$(dirname "$report_path")" && pwd)/$(basename "$report_path")"
+
+        {
+          echo "report<<'EOF'"
+          printf '%s\n' "$report"
+          echo "EOF"
+          echo "report_path=$report_abs"
+        } >> "$GITHUB_OUTPUT"
