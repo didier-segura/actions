@@ -10,6 +10,9 @@ inputs:
   api-key:
     description: EcoScalpel API key stored in the CLI config (masked).
     default: ""
+  download_url:
+    description: Optional direct download URL for the EcoScalpel binary.
+    default: ""
   version:
     description: >
       EcoScalpel release version to install (e.g. v0.8.1). Use "latest" to pull
@@ -34,52 +37,57 @@ runs:
         install_dir="${INSTALL_DIR}"
         mkdir -p "$install_dir"
 
-        owner="didier-segura"
-        repo="ecoscalpel"
-        version="${VERSION}"
-        if [ "$version" = "latest" ]; then
-          release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest")"
-          version="$(echo "$release_data" | jq -r '.tag_name')"
+        if [ -n "${{ inputs.download_url }}" ]; then
+          asset_url="${{ inputs.download_url }}"
+          version="${VERSION}"
         else
-          release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/tags/$version")"
-        fi
-        if [ -z "$version" ] || [ "$version" = "null" ]; then
-          echo "::error::Failed to determine EcoScalpel release version"
-          exit 1
-        fi
-        if [ -z "${release_data:-}" ] || [ "$release_data" = "null" ]; then
-          release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest")"
-        fi
+          owner="didier-segura"
+          repo="ecoscalpel"
+          version="${VERSION}"
+          if [ "$version" = "latest" ]; then
+            release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest")"
+            version="$(echo "$release_data" | jq -r '.tag_name')"
+          else
+            release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/tags/$version")"
+          fi
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::Failed to determine EcoScalpel release version"
+            exit 1
+          fi
+          if [ -z "${release_data:-}" ] || [ "$release_data" = "null" ]; then
+            release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest")"
+          fi
 
-        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-        arch="$(uname -m)"
-        case "$arch" in
-          x86_64) arch="amd64" ;;
-          aarch64|arm64) arch="arm64" ;;
-          *) echo "::error::Unsupported architecture: $arch"; exit 1 ;;
-        esac
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m)"
+          case "$arch" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="arm64" ;;
+            *) echo "::error::Unsupported architecture: $arch"; exit 1 ;;
+          esac
 
-        asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch "$arch" '
-          [ .assets[]
-            | select(.name | test("ecoscalpel-" + $os + "-" + $arch + "", "i") )
-            | .browser_download_url ][0]')"
-
-        if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
-          asset_url="$(echo "$release_data" | jq -r --arg os "$os" '
+          asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch "$arch" '
             [ .assets[]
-              | select(.name | test("ecoscalpel-" + $os, "i"))
+              | select(.name | test("ecoscalpel-" + $os + "-" + $arch + "", "i") )
               | .browser_download_url ][0]')"
-        fi
 
-        if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
-          asset_url="$(echo "$release_data" | jq -r '
-            [ .assets[]
-              | select(.name | test("ecoscalpel", "i"))
-              | .browser_download_url ][0]')"
-        fi
+          if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
+            asset_url="$(echo "$release_data" | jq -r --arg os "$os" '
+              [ .assets[]
+                | select(.name | test("ecoscalpel-" + $os, "i"))
+                | .browser_download_url ][0]')"
+          fi
 
-        if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
-          asset_url="https://github.com/$owner/$repo/releases/download/${version}/ecoscalpel-${os}-${arch}"
+          if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
+            asset_url="$(echo "$release_data" | jq -r '
+              [ .assets[]
+                | select(.name | test("ecoscalpel", "i"))
+                | .browser_download_url ][0]')"
+          fi
+
+          if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
+            asset_url="https://github.com/$owner/$repo/releases/download/${version}/ecoscalpel-${os}-${arch}"
+          fi
         fi
 
         asset_name="$(basename "$asset_url")"
