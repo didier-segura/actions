@@ -53,9 +53,15 @@ inputs:
   setup_api_key:
     description: API key forwarded to the setup action.
     default: ""
+  setup_token:
+    description: GitHub token forwarded to the setup action for authenticated downloads.
+    default: ""
   version:
     description: EcoScalpel release version to install when running setup.
     default: latest
+  download_url:
+    description: Direct download URL passed to the setup action. Overrides version.
+    default: ""
 outputs:
   plan_path:
     description: Absolute path to the Terraform plan JSON that EcoScalpel consumed.
@@ -74,6 +80,8 @@ runs:
       uses: ./../setup
       with:
         api-key: ${{ inputs.setup_api_key }}
+        token: ${{ inputs.setup_token }}
+        download_url: ${{ inputs.download_url }}
         version: ${{ inputs.version }}
 
     - name: Generate Terraform plan (JSON)

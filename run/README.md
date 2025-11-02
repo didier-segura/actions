@@ -69,6 +69,8 @@ jobs:
 | `output_file` | Where to write the CLI output. Inferred from `format` if omitted. | |
 | `push_endpoint`, `push_api_key`, `push_project`, `push_metadata`, `push_fail_on_error` | Forwarded to EcoScalpel for collector uploads. | |
 | `setup_api_key` | API key forwarded to the setup action (stored in the CLI config). | |
+| `setup_token` | GitHub token forwarded to the setup action for downloading private releases. | |
+| `download_url` | Direct download URL passed to the setup action. | |
 | `version` | EcoScalpel release version to install (default `latest`). | |
 
 ### Outputs

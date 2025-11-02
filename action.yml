@@ -46,6 +46,14 @@ inputs:
     description: Destination file for the EcoScalpel report. Defaults to an inferred name based on format.
     required: false
     default: ""
+  download_url:
+    description: Direct download URL for the EcoScalpel binary passed to the setup step.
+    required: false
+    default: ""
+  setup_token:
+    description: GitHub token passed to the setup action for authenticated downloads.
+    required: false
+    default: ""
   push_endpoint:
     description: Optional collector endpoint for uploading reports.
     required: false
@@ -84,6 +92,8 @@ runs:
       uses: ./run
       with:
         setup_api_key: ${{ inputs.api-key }}
+        setup_token: ${{ inputs.setup_token }}
+        download_url: ${{ inputs.download_url }}
         version: ${{ inputs.version }}
         mode: ${{ inputs.mode }}
         terraform_dir: ${{ inputs.terraform_dir }}

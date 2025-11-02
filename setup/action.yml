@@ -17,6 +17,9 @@ inputs:
     description: >
       EcoScalpel release tag to install (e.g. prod-0.0.7). Required when download_url is not provided.
     default: ""
+  token:
+    description: Optional GitHub token used to authenticate download requests for private repositories.
+    default: ""
 outputs:
   ecoscalpel-path:
     description: Absolute path to the EcoScalpel binary.
@@ -35,6 +38,8 @@ runs:
 
         install_dir="${INSTALL_DIR}"
         mkdir -p "$install_dir"
+
+        TOKEN="${{ inputs.token }}"
 
         if [ -n "${{ inputs.download_url }}" ]; then
           asset_url="${{ inputs.download_url }}"
@@ -60,7 +65,12 @@ runs:
         tmp_dir="$(mktemp -d)"
         archive="$tmp_dir/$asset_name"
         echo "Downloading $asset_url"
-        curl -fsSL "$asset_url" -o "$archive"
+        curl_cmd=(curl -fsSL)
+        if [ -n "$TOKEN" ]; then
+          curl_cmd+=(-H "Authorization: Bearer $TOKEN" -H "X-GitHub-Api-Version: 2022-11-28")
+        fi
+        curl_cmd+=("$asset_url" -o "$archive")
+        "${curl_cmd[@]}"
 
         case "$archive" in
           *.tar.gz|*.tgz) tar -xzf "$archive" -C "$tmp_dir" ;;

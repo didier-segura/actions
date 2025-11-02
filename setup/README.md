@@ -35,6 +35,7 @@ jobs:
 | `api-key` | Optional API key written to `~/.config/ecoscalpel/config.json`. | |
 | `download_url` | Direct download URL for the EcoScalpel binary. Overrides the version setting. | |
 | `version` | Release tag used to construct the download URL when `download_url` is blank (e.g. `prod-0.0.7`). | _required if `download_url` omitted_ |
+| `token` | GitHub token included in the download request (needed for private releases). | |
 
 ### Outputs
 
@@ -45,6 +46,7 @@ jobs:
 > **Note**
 > When `download_url` is not supplied, the action downloads
 > `https://github.com/didier-segura/ecoscalpel/releases/download/<version>/ecoscalpel-<os>-<arch>`.
+> Provide `token` (for example `${{ secrets.GITHUB_TOKEN }}` or a PAT) when the release lives in a private repository.
 
 You can combine this setup action with other custom actions (for example,
 [`actions/run`](../run)) or call the CLI directly in subsequent steps.
