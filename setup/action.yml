@@ -38,11 +38,17 @@ runs:
         repo="ecoscalpel"
         version="${VERSION}"
         if [ "$version" = "latest" ]; then
-          version="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest" | jq -r '.tag_name')"
+          release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest")"
+          version="$(echo "$release_data" | jq -r '.tag_name')"
+        else
+          release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/tags/$version")"
         fi
         if [ -z "$version" ] || [ "$version" = "null" ]; then
           echo "::error::Failed to determine EcoScalpel release version"
           exit 1
+        fi
+        if [ -z "${release_data:-}" ] || [ "$release_data" = "null" ]; then
+          release_data="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest")"
         fi
 
         os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -53,20 +59,51 @@ runs:
           *) echo "::error::Unsupported architecture: $arch"; exit 1 ;;
         esac
 
-        asset="ecoscalpel_${os}_${arch}.tar.gz"
-        url="https://github.com/$owner/$repo/releases/download/${version}/${asset}"
+        case "$arch" in
+          amd64) arch_regex="(amd64|x86_64)";;
+          arm64) arch_regex="(arm64|aarch64)";;
+          *) arch_regex="$arch";;
+        esac
+
+        asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch_regex "$arch_regex" '
+          [ .assets[]
+            | select(.name | test($os; "i"))
+            | select(.name | test($arch_regex; "i"))
+            | select(.name | test("tar\\.gz$"))
+            | .browser_download_url ][0]')"
+
+        if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
+          asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch_regex "$arch_regex" '
+            [ .assets[]
+              | select(.name | test($os; "i"))
+              | select(.name | test($arch_regex; "i"))
+              | .browser_download_url ][0]')"
+        fi
+
+        if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
+          echo "::error::Could not find a release asset for OS=$os arch=$arch in $version"
+          exit 1
+        fi
+
+        asset_name="$(basename "$asset_url")"
 
         tmp_dir="$(mktemp -d)"
-        archive="$tmp_dir/$asset"
-        echo "Downloading $url"
-        curl -fsSL "$url" -o "$archive"
-        tar -xzf "$archive" -C "$tmp_dir"
+        archive="$tmp_dir/$asset_name"
+        echo "Downloading $asset_url"
+        curl -fsSL "$asset_url" -o "$archive"
 
-        if [ ! -f "$tmp_dir/ecoscalpel" ]; then
+        case "$archive" in
+          *.tar.gz|*.tgz) tar -xzf "$archive" -C "$tmp_dir" ;;
+          *.zip) unzip -q "$archive" -d "$tmp_dir" ;;
+          *) echo "::error::Unsupported archive format for $asset_name"; exit 1 ;;
+        esac
+
+        extracted_binary="$(find "$tmp_dir" -maxdepth 2 -type f -name 'ecoscalpel' | head -n1)"
+        if [ -z "$extracted_binary" ]; then
           echo "::error::Downloaded archive did not contain ecoscalpel binary"
           exit 1
         fi
-        mv "$tmp_dir/ecoscalpel" "$install_dir/ecoscalpel"
+        mv "$extracted_binary" "$install_dir/ecoscalpel"
 
         chmod +x "$install_dir/ecoscalpel"
         echo "$install_dir" >> "$GITHUB_PATH"
