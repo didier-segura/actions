@@ -31,7 +31,7 @@ jobs:
 
 | Input | Description | Default |
 | --- | --- | --- |
-| `install-dir` | Directory that will receive the `ecoscalpel` binary. | `${{ runner.temp }}/ecoscalpel/bin` |
+| `install_dir` | Directory that will receive the `ecoscalpel` binary. | `${{ runner.temp }}/ecoscalpel/bin` |
 | `api-key` | Optional API key written to `~/.config/ecoscalpel/config.json`. | |
 | `version` | Release tag to install (e.g. `v0.8.1`). Use `latest` for the most recent release. | `latest` |
 

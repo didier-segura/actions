@@ -4,7 +4,7 @@ branding:
   icon: activity
   color: purple
 inputs:
-  install-dir:
+  install_dir:
     description: Directory where the EcoScalpel binary will be stored.
     default: ${{ runner.temp }}/ecoscalpel/bin
   api-key:
@@ -26,7 +26,7 @@ runs:
       id: build
       shell: bash
       env:
-        INSTALL_DIR: ${{ inputs['install-dir'] }}
+        INSTALL_DIR: ${{ inputs.install_dir }}
         VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
@@ -86,24 +86,24 @@ runs:
         mkdir -p "$config_dir"
 
         python3 - "$config_file" <<'PY'
-import json, os, sys, datetime
+        import json, os, sys, datetime
 
-cfg_path = sys.argv[1]
-api_key = os.environ["API_KEY"]
-now = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        cfg_path = sys.argv[1]
+        api_key = os.environ["API_KEY"]
+        now = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
-cfg = {}
-try:
-    with open(cfg_path, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-except FileNotFoundError:
-    pass
-except Exception as exc:
-    print(f"::warning::Could not parse existing config {cfg_path}: {exc}")
+        cfg = {}
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except FileNotFoundError:
+            pass
+        except Exception as exc:
+            print(f"::warning::Could not parse existing config {cfg_path}: {exc}")
 
-cfg["api_key"] = api_key
-cfg["updated_at"] = now
+        cfg["api_key"] = api_key
+        cfg["updated_at"] = now
 
-with open(cfg_path, "w", encoding="utf-8") as f:
-    json.dump(cfg, f, indent=2)
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
 PY
