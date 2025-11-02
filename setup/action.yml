@@ -33,6 +33,7 @@ runs:
       env:
         INSTALL_DIR: ${{ inputs.install_dir }}
         VERSION: ${{ inputs.version }}
+        TOKEN: ${{ inputs.token }}
       run: |
         set -euo pipefail
 
