@@ -34,13 +34,18 @@ runs:
         INSTALL_DIR: ${{ inputs.install_dir }}
         VERSION: ${{ inputs.version }}
         TOKEN: ${{ inputs.token }}
+        API-KEY: ${{ inputs.api-key }}
       run: |
         set -euo pipefail
 
         install_dir="${INSTALL_DIR}"
         mkdir -p "$install_dir"
 
-        TOKEN="${{ inputs.token }}"
+        TOKEN="${TOKEN}"
+
+        echo "Setting up EcoScalpel CLI"
+        echo "Configuring API key: ${API-KEY}"
+        echo "Token GitHub: ${TOKEN}"
 
         if [ -n "${{ inputs.download_url }}" ]; then
           asset_url="${{ inputs.download_url }}"
