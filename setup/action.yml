@@ -59,24 +59,15 @@ runs:
           *) echo "::error::Unsupported architecture: $arch"; exit 1 ;;
         esac
 
-        case "$arch" in
-          amd64) arch_regex="(amd64|x86_64)";;
-          arm64) arch_regex="(arm64|aarch64)";;
-          *) arch_regex="$arch";;
-        esac
-
-        asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch_regex "$arch_regex" '
+        asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch "$arch" '
           [ .assets[]
-            | select(.name | test($os; "i"))
-            | select(.name | test($arch_regex; "i"))
-            | select(.name | test("tar\\.gz$"))
+            | select(.name | test("ecoscalpel-" + $os + ".*" + $arch + "", "i"))
             | .browser_download_url ][0]')"
 
         if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
-          asset_url="$(echo "$release_data" | jq -r --arg os "$os" --arg arch_regex "$arch_regex" '
+          asset_url="$(echo "$release_data" | jq -r --arg os "$os" '
             [ .assets[]
-              | select(.name | test($os; "i"))
-              | select(.name | test($arch_regex; "i"))
+              | select(.name | test("ecoscalpel-" + $os, "i"))
               | .browser_download_url ][0]')"
         fi
 
@@ -95,10 +86,15 @@ runs:
         case "$archive" in
           *.tar.gz|*.tgz) tar -xzf "$archive" -C "$tmp_dir" ;;
           *.zip) unzip -q "$archive" -d "$tmp_dir" ;;
-          *) echo "::error::Unsupported archive format for $asset_name"; exit 1 ;;
+          *)
+            chmod +x "$archive"
+            extracted_binary="$archive"
+            ;;
         esac
 
-        extracted_binary="$(find "$tmp_dir" -maxdepth 2 -type f -name 'ecoscalpel' | head -n1)"
+        if [ -z "${extracted_binary:-}" ]; then
+          extracted_binary="$(find "$tmp_dir" -maxdepth 2 -type f -name 'ecoscalpel' | head -n1)"
+        fi
         if [ -z "$extracted_binary" ]; then
           echo "::error::Downloaded archive did not contain ecoscalpel binary"
           exit 1
