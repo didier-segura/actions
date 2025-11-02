@@ -33,7 +33,8 @@ jobs:
 | --- | --- | --- |
 | `install_dir` | Directory that will receive the `ecoscalpel` binary. | `${{ runner.temp }}/ecoscalpel/bin` |
 | `api-key` | Optional API key written to `~/.config/ecoscalpel/config.json`. | |
-| `version` | Release tag to install (e.g. `v0.8.1`). Use `latest` for the most recent release. | `latest` |
+| `download_url` | Direct download URL for the EcoScalpel binary. Overrides the version setting. | |
+| `version` | Release tag used to construct the download URL when `download_url` is blank (e.g. `prod-0.0.7`). | _required if `download_url` omitted_ |
 
 ### Outputs
 
@@ -42,9 +43,8 @@ jobs:
 | `ecoscalpel-path` | Absolute path to the compiled EcoScalpel binary. |
 
 > **Note**
-> The action expects EcoScalpel releases to publish assets named
-> `ecoscalpel_<os>_<arch>.tar.gz` (for example `ecoscalpel_linux_amd64.tar.gz`).
-> The archive must contain a single `ecoscalpel` binary.
+> When `download_url` is not supplied, the action downloads
+> `https://github.com/didier-segura/ecoscalpel/releases/download/<version>/ecoscalpel-<os>-<arch>`.
 
 You can combine this setup action with other custom actions (for example,
 [`actions/run`](../run)) or call the CLI directly in subsequent steps.
