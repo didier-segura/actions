@@ -1,6 +1,6 @@
 # EcoScalpel GitHub Actions
 
-This directory mirrors the layout of [`infracost/actions`](https://github.com/infracost/actions)
+This directory mirrors the layout of [`ecoscalpel/actions`](https://github.com/ecoscalpel/actions)
 and provides reusable composite actions for the EcoScalpel ecosystem.
 
 | Action | Description |
@@ -70,4 +70,4 @@ jobs:
 ```
 
 This structure lets downstream repositories cherry-pick the pieces they need,
-just like the official Infracost actions collection.
+just like the official ecoscalpel actions collection.

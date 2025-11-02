@@ -1,0 +1,100 @@
+name: EcoScalpel Action
+description: Run EcoScalpel to estimate Scaleway cost, CO₂, and water metrics for Terraform projects.
+author: didier-segura
+branding:
+  icon: activity
+  color: purple
+inputs:
+  api-key:
+    description: >
+      EcoScalpel API key used for authenticated pushes to the collector and
+      dashboard integrations.
+    required: false
+  version:
+    description: EcoScalpel release version to install (for example `v0.8.1`). Use `latest` to pull the most recent release.
+    required: false
+    default: latest
+  mode:
+    description: Choose `plan` to analyse a Terraform plan JSON or `dir` to parse Terraform source files directly.
+    required: false
+    default: plan
+  terraform_dir:
+    description: Directory containing the Terraform configuration when `mode` is `dir`.
+    required: false
+    default: .
+  plan_file:
+    description: Path to the Terraform plan JSON file when `mode` is `plan`.
+    required: false
+    default: ecoscalpel-plan.json
+  skip_plan:
+    description: Set to `true` to reuse the provided plan JSON instead of generating a fresh one.
+    required: false
+    default: "false"
+  terraform_plan_args:
+    description: Additional arguments passed to `terraform plan` when generating a plan JSON.
+    required: false
+    default: -lock=false
+  format:
+    description: Output format for EcoScalpel (`table`, `markdown`, or `json`).
+    required: false
+    default: markdown
+  style:
+    description: Optional style flag for EcoScalpel (for example `fancy`). Leave blank to omit.
+    required: false
+    default: fancy
+  output_file:
+    description: Destination file for the EcoScalpel report. Defaults to an inferred name based on format.
+    required: false
+    default: ""
+  push_endpoint:
+    description: Optional collector endpoint for uploading reports.
+    required: false
+    default: ""
+  push_api_key:
+    description: API key used when pushing reports to the collector endpoint.
+    required: false
+    default: ""
+  push_project:
+    description: Project identifier associated with pushed reports.
+    required: false
+    default: ""
+  push_metadata:
+    description: Comma-separated list of key=value metadata pairs attached to pushed reports.
+    required: false
+    default: ""
+  push_fail_on_error:
+    description: If set to `true`, pipeline will fail when report upload fails.
+    required: false
+    default: "false"
+outputs:
+  plan_path:
+    description: Absolute path to the Terraform plan JSON that EcoScalpel consumed.
+    value: ${{ steps.run.outputs.plan_path }}
+  report_path:
+    description: Absolute path to the generated EcoScalpel report.
+    value: ${{ steps.run.outputs.report_path }}
+  report:
+    description: Raw EcoScalpel report content in the requested format.
+    value: ${{ steps.run.outputs.report }}
+runs:
+  using: composite
+  steps:
+    - name: Run EcoScalpel
+      id: run
+      uses: ./run
+      with:
+        setup_api_key: ${{ inputs.api-key }}
+        version: ${{ inputs.version }}
+        mode: ${{ inputs.mode }}
+        terraform_dir: ${{ inputs.terraform_dir }}
+        plan_file: ${{ inputs.plan_file }}
+        skip_plan: ${{ inputs.skip_plan }}
+        terraform_plan_args: ${{ inputs.terraform_plan_args }}
+        format: ${{ inputs.format }}
+        style: ${{ inputs.style }}
+        output_file: ${{ inputs.output_file }}
+        push_endpoint: ${{ inputs.push_endpoint }}
+        push_api_key: ${{ inputs.push_api_key }}
+        push_project: ${{ inputs.push_project }}
+        push_metadata: ${{ inputs.push_metadata }}
+        push_fail_on_error: ${{ inputs.push_fail_on_error }}
