@@ -10,12 +10,11 @@ inputs:
   api-key:
     description: EcoScalpel API key stored in the CLI config (masked).
     default: ""
-  repo:
-    description: Git repository URL containing the EcoScalpel CLI source.
-    default: https://github.com/didier-segura/ecoscalpel.git
-  ref:
-    description: Git ref (branch, tag, or commit) to checkout from the EcoScalpel repository.
-    default: main
+  version:
+    description: >
+      EcoScalpel release version to install (e.g. v0.8.1). Use "latest" to pull
+      the most recent GitHub release automatically.
+    default: latest
 outputs:
   ecoscalpel-path:
     description: Absolute path to the EcoScalpel binary.
@@ -23,36 +22,51 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: "1.22.x"
-        check-latest: true
-
-    - name: Build EcoScalpel
+    - name: Install EcoScalpel binary
       id: build
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs['install-dir'] }}
-        REPO: ${{ inputs.repo }}
-        REF: ${{ inputs.ref }}
+        VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
 
         install_dir="${INSTALL_DIR}"
         mkdir -p "$install_dir"
 
-        src_dir="$(mktemp -d)"
-        export GIT_TERMINAL_PROMPT=0
-        if [ -n "$REF" ]; then
-          git clone --depth=1 --branch "$REF" "$REPO" "$src_dir"
-        else
-          git clone --depth=1 "$REPO" "$src_dir"
+        owner="didier-segura"
+        repo="ecoscalpel"
+        version="${VERSION}"
+        if [ "$version" = "latest" ]; then
+          version="$(curl -fsSL "https://api.github.com/repos/$owner/$repo/releases/latest" | jq -r '.tag_name')"
+        fi
+        if [ -z "$version" ] || [ "$version" = "null" ]; then
+          echo "::error::Failed to determine EcoScalpel release version"
+          exit 1
         fi
 
-        pushd "$src_dir" >/dev/null
-        CGO_ENABLED=0 go build -o "$install_dir/ecoscalpel" .
-        popd >/dev/null
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$arch" in
+          x86_64) arch="amd64" ;;
+          aarch64|arm64) arch="arm64" ;;
+          *) echo "::error::Unsupported architecture: $arch"; exit 1 ;;
+        esac
+
+        asset="ecoscalpel_${os}_${arch}.tar.gz"
+        url="https://github.com/$owner/$repo/releases/download/${version}/${asset}"
+
+        tmp_dir="$(mktemp -d)"
+        archive="$tmp_dir/$asset"
+        echo "Downloading $url"
+        curl -fsSL "$url" -o "$archive"
+        tar -xzf "$archive" -C "$tmp_dir"
+
+        if [ ! -f "$tmp_dir/ecoscalpel" ]; then
+          echo "::error::Downloaded archive did not contain ecoscalpel binary"
+          exit 1
+        fi
+        mv "$tmp_dir/ecoscalpel" "$install_dir/ecoscalpel"
 
         chmod +x "$install_dir/ecoscalpel"
         echo "$install_dir" >> "$GITHUB_PATH"
