@@ -71,39 +71,3 @@ runs:
         chmod +x "$install_dir/ecoscalpel"
         echo "$install_dir" >> "$GITHUB_PATH"
         echo "cli_path=$(cd "$install_dir" && pwd)/ecoscalpel" >> "$GITHUB_OUTPUT"
-
-    - name: Configure EcoScalpel credentials
-      if: ${{ inputs.api-key != '' }}
-      shell: bash
-      env:
-        API_KEY: ${{ inputs.api-key }}
-      run: |
-        set -euo pipefail
-
-        echo "::add-mask::$API_KEY"
-        config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ecoscalpel"
-        config_file="$config_dir/config.json"
-        mkdir -p "$config_dir"
-
-        python3 - "$config_file" <<'PY'
-        import json, os, sys, datetime
-
-        cfg_path = sys.argv[1]
-        api_key = os.environ["API_KEY"]
-        now = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-
-        cfg = {}
-        try:
-            with open(cfg_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-        except FileNotFoundError:
-            pass
-        except Exception as exc:
-            print(f"::warning::Could not parse existing config {cfg_path}: {exc}")
-
-        cfg["api_key"] = api_key
-        cfg["updated_at"] = now
-
-        with open(cfg_path, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2)
-PY
